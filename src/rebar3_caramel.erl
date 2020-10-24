@@ -15,7 +15,7 @@ init(State) ->
     Provider = providers:create([
             {name, ?PROVIDER},
             {namespace, ?NAMESPACE},
-            {module, ?MODULE},
+            {module, rebar3_caramel_compiler},
             {bare, true},
             {deps, ?DEPS},
             {example, "rebar3 caramel compile"},

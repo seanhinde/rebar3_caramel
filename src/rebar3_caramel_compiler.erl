@@ -55,7 +55,7 @@ format_error(Reason) ->
 caramel_compile(_Opts, Source, OutDir) ->
     Cmd = "caramelc compile " ++ Source,
     rebar_api:console("Compile: ~s", [Cmd]),
-    rebar_api:info("Writing out ~s", [OutDir]).
+    rebar_api:info("Writing out ~s", [OutFile]).
 
 
 context(AppInfo) ->

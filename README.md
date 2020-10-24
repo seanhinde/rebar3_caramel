@@ -1,7 +1,7 @@
 rebar3_caramel
 =====
 
-A rebar plugin
+A rebar plugin (at least the start of an experiment for one)
 
 Build
 -----

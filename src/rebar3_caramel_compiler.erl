@@ -33,19 +33,18 @@ needed_files(_, FoundFiles, Mappings, AppInfo) ->
 dependencies(File, _Dir, SrcDirs) ->
     SrcFiles = lists:append([src_files(SrcDir) || SrcDir <- SrcDirs]),
     Cmd = "caramelc sort-deps " ++ lists:join(" ", SrcFiles),
-    rebar_api:console("Deps: ~s", [Cmd]),
+    %% rebar_api:console("Deps: ~s", [Cmd]),
     [].
 
 compile(Source, [{".erl", SrcDir}], _, Opts) ->
     case os:find_executable("caramelc") of
         false ->
-            rebar_api:error("caramelc compiler not found. Make sure you have it installed (https://github.com/AbstractMachinesLab/caramel), and it is in your PATH or you have an executable_path set in your rebar.config", []),
+            rebar_api:error("caramelc compiler not found. Make sure you have it installed (https://github.com/AbstractMachinesLab/caramel) and it is in your PATH", []),
             rebar_compiler:error_tuple(Source, [], [], Opts);
         Exec ->
             {ok, Cwd} = file:get_cwd(),
             ok = file:set_cwd(SrcDir),
             Cmd = Exec ++ " compile " ++ Source,
-            rebar_api:console("Compile: ~s", [Cmd]),
             Res = os:cmd(Cmd),
             ok = file:set_cwd(Cwd),
             rebar_compiler:ok_tuple(Source, Res)

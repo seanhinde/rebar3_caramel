@@ -36,7 +36,7 @@ dependencies(File, _Dir, SrcDirs) ->
     rebar_api:console("Deps: ~s", [Cmd]),
     [].
 
-compile(Source, [{".ml", SrcDir}], _, Opts) ->
+compile(Source, [{".erl", SrcDir}], _, Opts) ->
     case os:find_executable("caramelc") of
         false ->
             rebar_api:error("caramelc compiler not found. Make sure you have it installed (https://github.com/AbstractMachinesLab/caramel), and it is in your PATH or you have an executable_path set in your rebar.config", []),

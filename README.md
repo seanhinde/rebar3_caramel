@@ -1,7 +1,7 @@
 rebar3_caramel
 =====
 
-A rebar plugin to invoke the [caramelc](https://github.com/AbstractMachinesLab/caramel) ocaml compiler in a rebar project.
+A rebar compiler plugin to invoke the [caramelc](https://github.com/AbstractMachinesLab/caramel) ocaml compiler in a rebar project.
 
 Early days. Some things on the list:
 

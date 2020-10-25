@@ -3,7 +3,7 @@ rebar3_caramel
 
 A rebar compiler plugin to invoke the [caramelc](https://github.com/AbstractMachinesLab/caramel) ocaml compiler in a rebar project.
 
-Early days. Some things on the list:
+Early days. Some things on the TODO list:
 
 - dependency ordering between ml modules
 - clean doesn't remove all the ml intermediate files

@@ -42,7 +42,7 @@ compile(Source, [{_, _}], _, Opts) ->
             rebar_api:error("caramelc compiler not found. Make sure you have it installed (https://github.com/AbstractMachinesLab/caramel), and it is in your PATH or you have an executable_path set in your rebar.config", []),
             rebar_compiler:error_tuple(Source, [], [], Opts);
         Exec ->
-            Cmd = Exec + " compile " ++ Source,
+            Cmd = Exec ++ " compile " ++ Source,
             rebar_api:console("Compile: ~s", [Cmd]),
             Res = os:cmd(Cmd),
             rebar_compiler:ok_tuple(Source, Res)

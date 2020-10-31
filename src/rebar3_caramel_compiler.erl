@@ -44,7 +44,6 @@ compile(Source, [{".erl", SrcDir}], _, Opts) ->
         Exec ->
             Command = Exec ++ " compile " ++ Source,
             {ok, Res} = rebar_utils:sh(Command, [{cd, SrcDir}, abort_on_error]),
-            rebar_api:console("Res: ~s", [Res]),
             rebar_compiler:ok_tuple(Source, Res)
     end.
 

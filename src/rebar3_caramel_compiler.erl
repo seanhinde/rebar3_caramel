@@ -1,5 +1,5 @@
 -module(rebar3_caramel_compiler).
--behaviour(rebar_compiler).
+% -behaviour(rebar_compiler).
 
 -export([context/1,
          needed_files/4,
@@ -28,13 +28,25 @@ needed_files(_, FoundFiles, Mappings, AppInfo) ->
     Opts = rebar_opts:get(rebar_app_info:opts(AppInfo), caramel_opts, []),
     Opts1 = update_opts(Opts, AppInfo),
 
+    rebar_api:console("Needed: ~p", [RestFiles]),
+
     {{FirstFiles, Opts1}, {RestFiles, Opts1}}.
 
 dependencies(File, _Dir, SrcDirs) ->
+    rebar_api:console("Deps src dirs: ~p", [SrcDirs]),
     SrcFiles = lists:append([src_files(SrcDir) || SrcDir <- SrcDirs]),
     Cmd = "caramelc sort-deps " ++ lists:join(" ", SrcFiles),
-    %% rebar_api:console("Deps: ~s", [Cmd]),
-    [].
+
+    rebar_api:console("Cmd: ~s", [Cmd]),
+    {ok, Res} = rebar_utils:sh(Cmd, [abort_on_error]),
+    rebar_api:console("Result: ~s", [Res]),
+    SortedDeps = string:tokens(Res, " \r\n"),
+    rebar_api:console("File: ~p", [File]),
+    rebar_api:console("Sorted: ~p", [SortedDeps]),
+    Deps = lists:takewhile(fun(D) -> D =/= File end, SortedDeps),
+    rebar_api:console("Deps: ~p", [Deps]),
+    Deps.
+
 
 compile(Source, [{".erl", SrcDir}], _, Opts) ->
     case os:find_executable("caramelc") of

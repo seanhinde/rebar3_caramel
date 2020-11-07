@@ -21,4 +21,5 @@ let start x = Process.make (fun _self recv -> loop ~recv x)
 
 let do_work () =
   let pid = start ("hi", 0) in
-  Erlang.send pid (`Hello "joe")
+  Erlang.send pid (`Hello "joe");
+  `Ok pid

@@ -29,9 +29,9 @@ init([]) ->
     SupFlags = #{strategy => one_for_all,
                  intensity => 0,
                  period => 1},
-    _ChildSpecs = [#{id => caramel_readme_srv,
+    ChildSpecs = [#{id => caramel_readme_srv,
                     start => {caramel_readme_srv, do_work, []}}],
-    ChildSpecs = [],
+    _ChildSpecs = [],
     {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions

@@ -40,6 +40,4 @@ There are example projects under examples/
 
 caramel_readme implements the simple server from the caramel README page. This cheats a little by including a snapshot of process.erl from the caramel runtime. 
 
-The server is not yet started by the supervisor. The server start function needs to return {ok, Pid} from ocaml. Not sure how to do that yet.
-
 caradeps is aimed at experimenting with compile dependencies.

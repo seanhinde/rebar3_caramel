@@ -59,17 +59,17 @@ needed_files(G, FoundFiles, Mappings, AppInfo) ->
 %% file changes. The Digraph is passed to other callbacks as `G' and annotates all files
 %% with their last changed timestamp
 %% Prior to 3.14, the `State' argument was not available.
-dependencies(File, _Dir, SrcDirs, State) ->
+dependencies(File, _Dir, SrcDirs, _State) ->
     SrcFiles = lists:append([src_files(SrcDir) || SrcDir <- SrcDirs]),
     Cmd = "caramelc sort-deps " ++ lists:join(" ", SrcFiles),
-    rebar_api:console("Cmd: ~s", [Cmd]),
+    %% rebar_api:console("Cmd: ~s", [Cmd]),
     {ok, Res} = rebar_utils:sh(Cmd, [abort_on_error]),
     SortedDeps = string:tokens(Res, " \r\n"),
-    rebar_api:console("File: ~p", [File]),
+    %% rebar_api:console("File: ~p", [File]),
     Deps = tl(lists:dropwhile(fun(D) -> D =/= File end, SortedDeps)),
-    rebar_api:console("Deps: ~p", [Deps]),
+    %% Deps = lists:takewhile(fun(D) -> D =/= File end, SortedDeps),
+    %% rebar_api:console("Deps: ~p", [Deps]),
     Deps.
-
 
 compile(Source, [{".erl", SrcDir}], _, Opts) ->
     case os:find_executable("caramelc") of
@@ -77,28 +77,44 @@ compile(Source, [{".erl", SrcDir}], _, Opts) ->
             rebar_api:error("caramelc compiler not found. Make sure you have it installed (https://github.com/AbstractMachinesLab/caramel) and it is in your PATH", []),
             rebar_compiler:error_tuple(Source, [], [], Opts);
         Exec ->
-            Command = Exec ++ " compile " ++ Source,
-            rebar_api:console("Compiling: ~p", [Source]),
-            {ok, Res} = rebar_utils:sh(Command, [{cd, SrcDir}, abort_on_error]),
+            SourceFile = filename:basename(Source),
+            Command = Exec ++ " compile " ++ SourceFile,
+            %% rebar_api:console("Compiling: ~p", [Source]),
+            Gen_dir = filename:join([filename:dirname(SrcDir), "gen", "src"]),
+            %% rebar_api:console("Creating: ~p", [Gen_dir]),
+            ok = filelib:ensure_dir(filename:join(Gen_dir, "dummy")),
+            {ok, _} = file:copy(Source, filename:join(Gen_dir, SourceFile)),
+            %% rebar_api:console("Copying: ~p ~p", [Source, filename:join(Gen_dir, SourceFile)]),
+            %% rebar_api:console("Compiling: ~p", [Command]),
+            {ok, Res} = rebar_utils:sh(Command, [{cd, Gen_dir}, abort_on_error]),
             rebar_compiler:ok_tuple(Source, Res)
     end.
 
 clean(MlFiles, _AppInfo) ->
     rebar_file_utils:delete_each(
-      [rebar_utils:to_list(re:replace(F, "\\.ml$", ".erl", [unicode]))
+      [rebar_utils:to_list(re:replace(gen_file(F), "\\.ml$", ".erl", [unicode]))
        || F <- MlFiles]),
     rebar_file_utils:delete_each(
-      [rebar_utils:to_list(re:replace(F, "\\.ml$", ".cmi", [unicode]))
+      [rebar_utils:to_list(re:replace(gen_file(F), "\\.ml$", ".cmi", [unicode]))
        || F <- MlFiles]),
     rebar_file_utils:delete_each(
-      [rebar_utils:to_list(re:replace(F, "\\.ml$", ".cmo", [unicode]))
+      [rebar_utils:to_list(re:replace(gen_file(F), "\\.ml$", ".cmo", [unicode]))
+       || F <- MlFiles]),
+    rebar_file_utils:delete_each(
+      [rebar_utils:to_list(gen_file(F))
        || F <- MlFiles]).
+
+gen_file(MlFile) ->
+    FileName = filename:basename(MlFile),
+    SrcPath = filename:dirname(MlFile),
+    filename:join([filename:dirname(SrcPath), "gen", "src", FileName]).
+
 
 update_opts(Opts, _AppInfo) ->
     Opts.
 
 src_files(Dir) ->
-    %% .mib extension is assumed to be valid here
+    %% .ml extension is assumed to be valid here
     case file:list_dir(Dir) of
         {ok, Files} ->
             [filename:join(Dir, File)

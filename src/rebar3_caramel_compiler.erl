@@ -1,5 +1,7 @@
 -module(rebar3_caramel_compiler).
-% -behaviour(rebar_compiler).
+-behaviour(rebar_compiler).
+
+-define(COMPILER_VSN, "v0.0.14").
 
 -export([context/1,
          needed_files/4,
@@ -13,11 +15,13 @@
 %% doing all the searching from these concepts.
 context(AppInfo) ->
     Dir = rebar_app_info:dir(AppInfo),
+    Compiler = find_compiler(Dir),
     Mappings = [{".erl", filename:join([Dir, "src"])}],
     #{src_dirs => ["src"],
       include_dirs => [],
       src_ext => ".ml",
-      out_mappings => Mappings}.
+      out_mappings => Mappings,
+      dependencies_opts => Compiler}.
 
 %% do your own analysis aided by the graph to specify what needs re-compiling.
 %% You can use this to add more or fewer files (i.e. compiler options changed),
@@ -35,7 +39,7 @@ needed_files(G, FoundFiles, Mappings, AppInfo) ->
      %% {Sequential, Parallel} build order for regular files, with shared
      %% compiler options
     %% {{["/path/to/file.erl", ...], ["other/files/mod.erl", ...]}, CompilerOpts}}.
-    
+
     FirstFiles = [],
 
     %% Remove first files from found files
@@ -47,10 +51,10 @@ needed_files(G, FoundFiles, Mappings, AppInfo) ->
     Opts1 = update_opts(Opts, AppInfo),
 
     SubGraph = digraph_utils:subgraph(G, NeededErlFiles), % get all the files and deps of those needing a rebuild
-    DepErlsOrdered = digraph_utils:topsort(SubGraph),
+    DepErlsOrdered = lists:reverse(digraph_utils:topsort(SubGraph)),
 
-    rebar_api:console("Needed: ~p", [NeededErlFiles]),
-    rebar_api:console("DepErlsOrdered: ~p", [DepErlsOrdered]),
+    %% rebar_api:console("Needed: ~p", [NeededErlFiles]),
+    %% rebar_api:console("DepErlsOrdered: ~p", [DepErlsOrdered]),
 
     {{FirstFiles, Opts1}, {DepErlsOrdered, Opts1}}.
 
@@ -59,20 +63,21 @@ needed_files(G, FoundFiles, Mappings, AppInfo) ->
 %% file changes. The Digraph is passed to other callbacks as `G' and annotates all files
 %% with their last changed timestamp
 %% Prior to 3.14, the `State' argument was not available.
-dependencies(File, _Dir, SrcDirs, _State) ->
+dependencies(File, _Dir, SrcDirs, Compiler) ->
     SrcFiles = lists:append([src_files(SrcDir) || SrcDir <- SrcDirs]),
-    Cmd = "caramelc sort-deps " ++ lists:join(" ", SrcFiles),
+    Cmd = Compiler ++" sort-deps " ++ lists:join(" ", SrcFiles),
     %% rebar_api:console("Cmd: ~s", [Cmd]),
     {ok, Res} = rebar_utils:sh(Cmd, [abort_on_error]),
     SortedDeps = string:tokens(Res, " \r\n"),
     %% rebar_api:console("File: ~p", [File]),
-    Deps = tl(lists:dropwhile(fun(D) -> D =/= File end, SortedDeps)),
-    %% Deps = lists:takewhile(fun(D) -> D =/= File end, SortedDeps),
+    %% Deps = tl(lists:dropwhile(fun(D) -> D =/= File end, SortedDeps)),
+    Deps = lists:takewhile(fun(D) -> D =/= File end, SortedDeps),
     %% rebar_api:console("Deps: ~p", [Deps]),
     Deps.
 
-compile(Source, [{".erl", SrcDir}], _, Opts) ->
-    case os:find_executable("caramelc") of
+compile(Source, [{".erl", SrcDir}], AppInfo, Opts) ->
+    TopDir = filename:dirname(dict:fetch(base_dir, AppInfo)),
+    case find_compiler(TopDir) of
         false ->
             rebar_api:error("caramelc compiler not found. Make sure you have it installed (https://github.com/AbstractMachinesLab/caramel) and it is in your PATH", []),
             rebar_compiler:error_tuple(Source, [], [], Opts);
@@ -89,6 +94,83 @@ compile(Source, [{".erl", SrcDir}], _, Opts) ->
             {ok, Res} = rebar_utils:sh(Command, [{cd, Gen_dir}, abort_on_error]),
             rebar_compiler:ok_tuple(Source, Res)
     end.
+
+find_compiler(TopDir) ->
+    %% Otherwise if there is a compiler in $PATH use that one
+    %% Otherwise install the current version of the compiler
+    case os:find_executable("caramelc") of
+        false ->
+            %% Look for a compiler in the plugins dir
+            %%AllDeps = rebar_state:all_plugin_deps(State),
+            %%case rebar_app_utils:find(rebar_utils:to_binary(rebar3_caramel), AllDeps) of
+            %%    {ok, AppInfo} ->
+            %%        rebar_api:console("CaramalApp: ~p", [rebar_app_info:fetch_dir(AppInfo)]),
+            %%        PluginsDir = rebar_app_info:fetch_dir(AppInfo),
+            %%        Compiler = filename:join([PluginsDir, "bin", "caramelc"]),
+            %%        ensure_compiler_version(Compiler);
+            %%    _ ->
+            %%        false
+            %%end;
+            PluginsDir = filename:join([TopDir, "_build", "default", "plugins", "rebar3_caramel"]),
+            Compiler = filename:join([PluginsDir, "caramel", "bin", "caramelc"]),
+            ok = ensure_compiler_version(Compiler, PluginsDir),
+            Compiler;
+        Exec ->
+            Exec
+    end.
+
+ensure_compiler_version(Compiler, PluginsDir) ->
+    case filelib:is_file(Compiler) of
+            true ->
+                % Is it the right version?
+                case rebar_utils:sh(Compiler ++ " --version", [return_on_error]) of
+                    {ok, VersionStr} ->
+                        Version = parse_version(VersionStr),
+                        if Version == ?COMPILER_VSN ->
+                              ok;
+                            true ->
+                                %% Not the right version, fetch the matching version
+                                rebar_api:info("Upgrading caramelc from ~s to ~s", [Version, ?COMPILER_VSN]),
+                                ok = install_compiler(PluginsDir)
+                        end;
+                    _ ->
+                        rebar_api:info("Installing caramelc ~s", [?COMPILER_VSN]),
+                        ok = install_compiler(PluginsDir)
+                end;
+            false ->
+                rebar_api:info("Installing caramelc ~s", [?COMPILER_VSN]),
+                ok = install_compiler(PluginsDir)
+        end.
+
+parse_version(VersionStr) ->
+    [Vsn |_] = string:tokens(VersionStr, "+"),
+    "v" ++ Vsn.
+
+install_compiler(PluginsDir) ->
+    URL = arch_specific_url(),
+    case httpc:request(get, {URL, []}, [], [{body_format, binary}]) of
+         {ok, {{_, 200, _}, _RespHeaders, RespBody}} ->
+            ok = erl_tar:extract({binary, RespBody}, [{cwd, PluginsDir}, compressed]);
+
+        {ok, {{_, StatusCode, _}, _RespHeaders, _RespBody}} ->
+             rebar_api:console("Install: ~p", [StatusCode]),
+             rebar_api:error("caramelc compiler failed to download ~p", [StatusCode]),
+            {error, StatusCode};
+        {error, Reason} ->
+             {error, Reason}
+    end.
+
+arch_specific_url() ->
+    BaseUrl = "https://github.com/AbstractMachinesLab/caramel/releases/download/" ++ ?COMPILER_VSN ++ "/caramel-" ++ ?COMPILER_VSN,
+    Arch = case os:type() of
+        {unix, linux} ->
+           "-x86_64-unknown-linux-gnu.tar.gz";
+        {unix, darwin} ->
+            "-x86_64-apple-darwin.tar.gz";
+        _ ->
+            ""
+    end,
+    BaseUrl ++ Arch.
 
 clean(MlFiles, _AppInfo) ->
     rebar_file_utils:delete_each(

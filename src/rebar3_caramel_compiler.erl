@@ -14,7 +14,8 @@
 %% specify what kind of files to find and where to find them. Rebar3 handles
 %% doing all the searching from these concepts.
 context(AppInfo) ->
-    Dir = rebar_app_info:dir(AppInfo),
+    OutDir = rebar_app_info:out_dir(AppInfo),
+    Dir = top_dir_from_out_dir(OutDir),
     Compiler = find_compiler(Dir),
     Mappings = [{".erl", filename:join([Dir, "src"])}],
     #{src_dirs => ["src"],
@@ -77,6 +78,7 @@ dependencies(File, _Dir, SrcDirs, Compiler) ->
 
 compile(Source, [{".erl", SrcDir}], AppInfo, Opts) ->
     TopDir = filename:dirname(dict:fetch(base_dir, AppInfo)),
+    %% rebar_api:console("TopDir: ~p", [TopDir]),
     case find_compiler(TopDir) of
         false ->
             rebar_api:error("caramelc compiler not found. Make sure you have it installed (https://github.com/AbstractMachinesLab/caramel) and it is in your PATH", []),
@@ -141,6 +143,11 @@ ensure_compiler_version(Compiler, PluginsDir) ->
                 rebar_api:info("Installing caramelc ~s", [?COMPILER_VSN]),
                 ok = install_compiler(PluginsDir)
         end.
+
+%% Couldn't be more ugly. We have _build somewhere in the path of out_dir. Pick everything above there
+top_dir_from_out_dir(OutDir) ->
+    [TopDir | _] = string:split(OutDir, "_build"),
+    TopDir.
 
 parse_version(VersionStr) ->
     [Vsn |_] = string:tokens(VersionStr, "+"),
